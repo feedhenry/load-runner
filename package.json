@@ -1,0 +1,22 @@
+{
+  "name": "load-runner",
+  "version": "1.0.0",
+  "author": "FeedHenry",
+  "bin": "./bin/load-runner.js",
+  "main": "index.js",
+  "dependencies": {
+    "async": "2.1.4",
+    "fh-fhc": "^2.17.1-516",
+    "nodeload": "david-martin/nodeload.git#master",
+    "open": "0.0.5",
+    "optimist": "0.6.1",
+    "request": "2.79.0",
+    "underscore": "^1.8.3"
+  },
+  "directories": {
+    "bin": "./bin"
+  },
+  "engines": {
+    "node": ">=4.4"
+  }
+}
