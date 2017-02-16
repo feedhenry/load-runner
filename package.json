@@ -2,6 +2,7 @@
   "name": "load-runner",
   "version": "1.0.0",
   "author": "FeedHenry",
+  "license": "Apache-2.0",
   "bin": "./bin/load-runner.js",
   "main": "index.js",
   "dependencies": {
