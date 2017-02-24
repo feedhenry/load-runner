@@ -2,13 +2,13 @@
 
 /*
 
-Load Runner
+ Load Runner
 
-Name based on the great classic game - Lode Runner
+ Name based on the great classic game - Lode Runner
  -Article: http://en.wikipedia.org/wiki/Lode_Runner
  -Online Game: http://www.classiconlinegames.nl/nintendo/174-loderunner
 
-*/
+ */
 
 var loop = require('nodeload/lib/loop');
 var runs = 0;
@@ -17,11 +17,16 @@ var stats = require('nodeload/lib/stats');
 var fs = require('fs');
 var util = require('util');
 var open = require('open');
+var lcg = require('compute-lcg');
 var setup_scripts = require('../setup/index.js');
 
 var args = require('yargs')
-  .usage('NOTE: To pass any commands onto the script being executed, finish with a -- followed by any arguments to the passed. You can also pass a placeholder `{runNum}` to pass in the current test run number.')
-  .options('c', {
+  .usage('NOTE: To pass any commands onto the script being executed, finish with a -- followed by any arguments to the passed. \n' +
+    'You can also add various placeholders like `{runNum}` instead of argument value and it will be replaced by a value.\n\n' +
+    'Placeholders:\n' +
+    '{runNum} - current test run number\n' +
+    '{rand} - randomly generated float number between 0 and 1, random value can be based on --seed'
+  ).options('c', {
     'alias': 'concurrency',
     'default': 1,
     'describe': 'Concurrency of Users'
@@ -46,44 +51,49 @@ var args = require('yargs')
     'demand': true,
     'describe': 'Script to execute'
   })
+  .options('seed', {
+    'demand': false,
+    'describe': 'Seed for random number generator (otherwise generated from current time)',
+    'type': 'number'
+  })
   .options('o', {
     'alias': 'output',
     'default': 'false',
     'describe': 'Whether or not to save logs, individual test script output and reports' +
-      '\nSave destination will be:' +
-      '\nruns/run_<script>_<timestamp>_<numUsers>_<concurrency>_<rampUp>/' +
-      '\ne.g. runs/run_test.js_1329317523630_100_10_5/'
+    '\nSave destination will be:' +
+    '\nruns/run_<script>_<timestamp>_<numUsers>_<concurrency>_<rampUp>/' +
+    '\ne.g. runs/run_test.js_1329317523630_100_10_5/'
   })
   .options('p', {
     'alias': 'profile',
     'demand': false,
     'describe': 'Only usefull if "-o true".\nProfile name, will be appended to output directory name:' +
-      '\ne.g. runs/run_test.js_1329317523630_100_10_5-profilename/'
+    '\ne.g. runs/run_test.js_1329317523630_100_10_5-profilename/'
   })
   .wrap(100).argv;
 
 var logger = {
   logDir: '',
-  info: function (msg) {
+  info: function(msg) {
     console.log(msg);
     logger.appendFile('info.txt', msg);
     logger.verbose(msg, true);
     logger.silly(msg, true);
   },
-  verbose: function (msg, dontConLog) {
+  verbose: function(msg, dontConLog) {
     if (!dontConLog) {
       console.log(msg);
     }
     logger.appendFile('verbose.txt', msg);
     logger.silly(msg, true);
   },
-  silly: function (msg, dontConLog) {
+  silly: function(msg, dontConLog) {
     if (!dontConLog) {
       console.log(msg);
     }
     logger.appendFile('silly.txt', msg);
   },
-  appendFile: function (file, msg) {
+  appendFile: function(file, msg) {
     // TODO: will async fs operations make any difference here?
     if (saveOutput) {
       var fileId = fs.openSync(logger.logDir + '/' + file, 'a');
@@ -97,6 +107,10 @@ var logger = {
 var outputDir = null;
 var saveOutput = false;
 var writeInProgess = 0;
+
+//initialize random number generator
+const seed = parseInt(args.seed);
+const rand = isNaN(seed) ? lcg() : lcg(seed);
 
 if (typeof args.o === 'boolean' || args.o === 'true') {
   saveOutput = true;
@@ -158,12 +172,13 @@ if (saveOutput) {
   };
 }
 
+
 var l = new loop.MultiLoop({
   'numberOfTimes': args.n,
   'concurrency': args.c,
   'concurrencyProfile': [[0, 0], [args.r, args.c]],
 
-  fun: function (finished) {
+  fun: function(finished) {
     logger.verbose('l.concurrency:' + l.concurrency);
     if (saveOutput) {
       reports.core.conChart.put({
@@ -186,17 +201,20 @@ var l = new loop.MultiLoop({
       if (arg === '{runNum}') {
         scriptArgs[i] = curRuns;
       }
+      if (arg === '{rand}') {
+        scriptArgs[i] = rand();
+      }
     });
 
     logger.verbose('spawing with args:' + JSON.stringify(scriptArgs));
-    
+
     var test = spawn('node', scriptArgs);
     runs++;
 
     // Read in json output from test run
     var dataRaw = null;
 
-    test.stdout.on('data', function (data) {
+    test.stdout.on('data', function(data) {
       logger.verbose(curRuns + ': received data length=' + data.length);
       // logger.info('data:'' + data.toString().substring(0,1) + ''');
       if (dataRaw === null) {
@@ -238,7 +256,7 @@ var l = new loop.MultiLoop({
       }
     });
 
-    test.stderr.on('data', function (data) {
+    test.stderr.on('data', function(data) {
       logger.info(curRuns + ': received error data:' + data);
       if (dataRaw === null) {
         dataRaw = '';
@@ -246,7 +264,7 @@ var l = new loop.MultiLoop({
       dataRaw += data;
     });
 
-    test.on('close', function (code) {
+    test.on('close', function(code) {
       logger.info(curRuns + ':END - exit code = ' + code);
       if (saveOutput) {
         reports.core.conChart.put({
@@ -342,7 +360,7 @@ var l = new loop.MultiLoop({
         var dataFileName = prefixedRuns + '-' + (success ? 'ok' : 'error') + '-' + duration + '.json';
         var dataFilePath = outputDir + '/' + dataFileName;
 
-        fs.writeFile(dataFilePath, dataToWrite, function (err) {
+        fs.writeFile(dataFilePath, dataToWrite, function(err) {
           if (err) {
             logger.info(curRuns + ':Error writing file:' + dataFilePath + '\n' + err.message);
           }
@@ -350,7 +368,7 @@ var l = new loop.MultiLoop({
 
         // write log output if we have any
         if (dataJson !== null && (typeof dataJson.log !== 'undefined')) {
-          fs.writeFile(dataFilePath.replace('.json', '.txt'), dataJson.log, function (err) {
+          fs.writeFile(dataFilePath.replace('.json', '.txt'), dataJson.log, function(err) {
             if (err) {
               logger.info(curRuns + ':Error writing file:' + dataFilePath + '\n' + err.message);
             }
@@ -368,14 +386,14 @@ var l = new loop.MultiLoop({
   }
 });
 
-/** 
+/**
  * Utility to manage execution of scripts 'before' the start of load-test
  * the 'before' script will be passed same parsed arguments as the
- * 
+ *
  * @param {String} beforeScript - Path to the script to run
  * @param {Function} cb - Callback, will be passed process exitCode
- **/ 
-var before = function (beforeScript, cb) {
+ **/
+var before = function(beforeScript, cb) {
   var scriptArgs = [args.b].concat(args._);
   var beforeScriptProcess = spawn('node', scriptArgs);
 
@@ -388,7 +406,7 @@ var startTime;
 
 // if the '--before' script is set, run it and wait with running the tests until before script completes
 if (args.b) {
-  before(args.b, function (exitCode) {
+  before(args.b, function(exitCode) {
     startTime = Date.now();
     l.start();
   });
@@ -397,7 +415,7 @@ if (args.b) {
   l.start();
 }
 
-l.on('end', function () {
+l.on('end', function() {
   var summary = {
     'duration': Date.now() - startTime,
     'successRuns': {
@@ -449,7 +467,7 @@ l.on('end', function () {
     // save summary to disk
     var summaryFilePath = outputDir + '/summary.json';
     writeInProgess++;
-    fs.writeFile(summaryFilePath, JSON.stringify(summary, null, 2), function (err) {
+    fs.writeFile(summaryFilePath, JSON.stringify(summary, null, 2), function(err) {
       if (err) {
         logger.verbose('Error writing file:' + summaryFilePath + '\n' + err.message);
       }
@@ -459,7 +477,7 @@ l.on('end', function () {
 
   if (saveOutput) {
     logger.verbose('wating 5000ms for charting/fs operations to finish');
-    setTimeout(function () {
+    setTimeout(function() {
       if (saveOutput) {
         var reportFile = reporting.REPORT_MANAGER.logNameOrObject;
         var destFile = outputDir + '/' + reportFile;
@@ -473,7 +491,7 @@ l.on('end', function () {
   }
 });
 
-var finish = function (summary) {
+var finish = function(summary) {
   logger.verbose(JSON.stringify(summary, null, 2));
   process.exit(0);
 };
