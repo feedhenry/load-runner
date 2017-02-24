@@ -3,7 +3,7 @@
 var lr = require('../../index.js')();
 var async = require('async');
 var request = require('request');
-var args = require('optimist');
+var args = require('yargs');
 var crypto = require('crypto');
 var fs = require('fs');
 

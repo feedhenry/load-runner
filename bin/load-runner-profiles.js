@@ -10,7 +10,7 @@ const async = require('async'),
       path = require('path');
 
 
-var args = require('optimist')
+var args = require('yargs')
   .usage('NOTE: To pass any commands onto the script being executed, finish with a -- followed by any arguments to the passed')
   .options('p', {
     'alias': 'profiles',

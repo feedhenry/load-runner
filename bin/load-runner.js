@@ -19,7 +19,7 @@ var util = require('util');
 var open = require('open');
 var setup_scripts = require('../setup/index.js');
 
-var args = require('optimist')
+var args = require('yargs')
   .usage('NOTE: To pass any commands onto the script being executed, finish with a -- followed by any arguments to the passed. You can also pass a placeholder `{runNum}` to pass in the current test run number.')
   .options('c', {
     'alias': 'concurrency',
