@@ -11,6 +11,8 @@ Options:
   -r, --rampUp       Ramp up time to Concurrency of Users (in seconds)                  [default: 1]
   -b, --before       Library to execute before the start of tests
   -s, --script       Script to execute                                                    [required]
+  --seed             Seed for random number generator (otherwise generated from current time)
+                                                                                            [number]
   -o, --output       Whether or not to save logs, individual test script output and reports
                      Save destination will be:
                      runs/run_<script>_<timestamp>_<numUsers>_<concurrency>_<rampUp>/
@@ -18,8 +20,6 @@ Options:
   -p, --profile      Only usefull if "-o true".
                      Profile name, will be appended to output directory name:
                      e.g. runs/run_test.js_1329317523630_100_10_5-profilename/
-
-Missing required arguments: s
 ```
 
 For example:
@@ -33,6 +33,16 @@ It is possible to send args to the script under test by adding -- after the load
 ```
 ./bin/load-runner.js -s ./scripts/dummy.js -c 5 -n 100 -r 10 -o -- -testarg1 testval1
 ```
+
+# Environment variables
+
+There are some environment variables generated for the test script that can be useful. You can use Node.js `process.env` object to access them.
+
+* `LR_RUN_COUNT` - total number of runs, it's value of `-n` parameter
+* `LR_RUN_NUMBER` - current test run number
+* `LR_RAND` - randomly generated value for each run, float between 0 and 1, based on random generation with `--seed` parameter
+
+Look at [scripts/dummy_env_vars.js](scripts/dummy_env_vars.js) for example of using this.
 
 # Output
 

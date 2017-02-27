@@ -7,6 +7,7 @@
   "main": "index.js",
   "dependencies": {
     "async": "2.1.4",
+    "compute-lcg": "1.0.0",
     "fh-fhc": "^2.17.1-516",
     "nodeload": "david-martin/nodeload.git#master",
     "open": "0.0.5",
