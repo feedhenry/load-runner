@@ -3,7 +3,15 @@
 ```
 npm install
 ./bin/load-runner.js
-NOTE: To pass any commands onto the script being executed, finish with a -- followed by any arguments to the passed. You can also pass a placeholder `{runNum}` to pass in the current test run number.
+NOTE: To pass any commands onto the script being executed, finish with a -- followed by any
+arguments to the passed.
+You can also add various placeholders like `{runNum}` instead of argument value and it will be
+replaced by a value.
+
+Placeholders:
+{runNum} - current test run number
+{runCount} - total number of runs
+{rand} - randomly generated float number between 0 and 1, random value can be based on --seed
 
 Options:
   -c, --concurrency  Concurrency of Users                                               [default: 1]
@@ -11,6 +19,8 @@ Options:
   -r, --rampUp       Ramp up time to Concurrency of Users (in seconds)                  [default: 1]
   -b, --before       Library to execute before the start of tests
   -s, --script       Script to execute                                                    [required]
+  --seed             Seed for random number generator (otherwise generated from current time)
+                                                                                            [number]
   -o, --output       Whether or not to save logs, individual test script output and reports
                      Save destination will be:
                      runs/run_<script>_<timestamp>_<numUsers>_<concurrency>_<rampUp>/
@@ -18,8 +28,6 @@ Options:
   -p, --profile      Only usefull if "-o true".
                      Profile name, will be appended to output directory name:
                      e.g. runs/run_test.js_1329317523630_100_10_5-profilename/
-
-Missing required arguments: s
 ```
 
 For example:
@@ -33,6 +41,13 @@ It is possible to send args to the script under test by adding -- after the load
 ```
 ./bin/load-runner.js -s ./scripts/dummy.js -c 5 -n 100 -r 10 -o -- -testarg1 testval1
 ```
+
+The placeholders can be used to replace some argument value and pass it as argument to the test script.
+
+```
+./bin/load-runner.js -s ./scripts/dummy_placeholder.js -c 5 -n 100 -r 10 -o -- -r {rand}
+```
+
 
 # Output
 

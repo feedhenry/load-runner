@@ -1,4 +1,5 @@
 node_modules
-runs/*
+runs/
 results-*.html
 .idea/
+load-runner.iml
