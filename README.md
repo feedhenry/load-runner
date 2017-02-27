@@ -10,6 +10,7 @@ replaced by a value.
 
 Placeholders:
 {runNum} - current test run number
+{runCount} - total number of runs
 {rand} - randomly generated float number between 0 and 1, random value can be based on --seed
 
 Options:

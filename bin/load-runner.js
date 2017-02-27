@@ -25,6 +25,7 @@ var args = require('yargs')
     'You can also add various placeholders like `{runNum}` instead of argument value and it will be replaced by a value.\n\n' +
     'Placeholders:\n' +
     '{runNum} - current test run number\n' +
+    '{runCount} - total number of runs\n' +
     '{rand} - randomly generated float number between 0 and 1, random value can be based on --seed'
   ).options('c', {
     'alias': 'concurrency',
@@ -197,14 +198,23 @@ var l = new loop.MultiLoop({
 
     var scriptArgs = [args.s].concat(args._);
 
-    scriptArgs.forEach(function(arg, i) {
-      if (arg === '{runNum}') {
-        scriptArgs[i] = curRuns;
-      }
-      if (arg === '{rand}') {
-        scriptArgs[i] = rand();
-      }
-    });
+    scriptArgs.forEach(
+      function(arg, i) {
+        switch (arg) {
+          case '{runNum}': {
+            scriptArgs[i] = curRuns;
+            break;
+          }
+          case '{rand}': {
+            scriptArgs[i] = rand();
+            break;
+          }
+          case '{runCount}': {
+            scriptArgs[i] = args.n;
+            break;
+          }
+        }
+      });
 
     logger.verbose('spawing with args:' + JSON.stringify(scriptArgs));
 
