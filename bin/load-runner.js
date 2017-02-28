@@ -20,7 +20,7 @@ var open = require('open');
 var lcg = require('compute-lcg');
 var setup_scripts = require('../setup/index.js');
 
-var args = require('optimist')
+var args = require('yargs')
   .usage('NOTE: To pass any commands onto the script being executed, finish with a -- followed by any arguments to the passed. You can also pass a placeholder `{runNum}` to pass in the current test run number.')
   .options('c', {
     'alias': 'concurrency',
@@ -30,7 +30,7 @@ var args = require('optimist')
   .options('n', {
     'alias': 'numUsers',
     'default': 1,
-    'describe': 'Number of Users'
+    'describe': 'Number of Users (number of total runs)'
   })
   .options('r', {
     'alias': 'rampUp',
@@ -52,6 +52,12 @@ var args = require('optimist')
     'describe': 'Seed for random number generator (otherwise generated from current time)',
     'type': 'number'
   })
+  .options('f', {
+    'alias': 'flows',
+    'demand': false,
+    'describe': 'Each flow will be selected with probability specified by percentages specified with this parameter, you need to use this with LR_FLOW_NUM environment variable',
+    'type': 'array'
+  })
   .options('o', {
     'alias': 'output',
     'default': 'false',
@@ -65,6 +71,14 @@ var args = require('optimist')
     'demand': false,
     'describe': 'Only usefull if "-o true".\nProfile name, will be appended to output directory name:' +
     '\ne.g. runs/run_test.js_1329317523630_100_10_5-profilename/'
+  })
+  .check(function(argv) {
+    const seed = parseInt(argv.seed);
+    if (seed <= 0) {
+      console.log("--seed must be positive number");
+      return false;
+    }
+    return true;
   })
   .wrap(100).argv;
 
@@ -108,6 +122,15 @@ var writeInProgess = 0;
 const seed = parseInt(args.seed);
 const rand = isNaN(seed) ? lcg() : lcg(seed);
 
+//Flow number generation function
+const generateFlowArray = require('./flow_number_generator');
+
+var flowNumbers = null;
+if (Array.isArray(args.flows) && args.flows.length > 1) {
+  flowNumbers = generateFlowArray(args.numUsers, args.flows, rand);
+}
+
+
 if (typeof args.o === 'boolean' || args.o === 'true') {
   saveOutput = true;
   var runsDir = './runs';
@@ -121,7 +144,7 @@ if (typeof args.o === 'boolean' || args.o === 'true') {
     // doesn't exist, create it
     fs.mkdirSync(runsDir);
   }
-  outputDir = runsDir + '/run_' + args.s.replace(/\//g, '_') + '_' + Date.now() + '_' + args.n + '_' + args.c + '_' + args.r + '_' + args.p;
+  outputDir = runsDir + '/run_' + args.s.replace(/\//g, '_') + '_' + Date.now() + '_' + args.numUsers + '_' + args.concurrency + '_' + args.r + '_' + args.p;
   fs.mkdirSync(outputDir);
   logger.logDir = outputDir;
   console.log('Output will be saved to ' + outputDir);
@@ -150,16 +173,16 @@ if (saveOutput) {
   reporting = require('nodeload/lib/reporting');
   genReport = reporting.REPORT_MANAGER.addReport('GENERAL');
   reports.core = {
-    'conChart': genReport.getChart('Test Concurrency (shows rampup from 0 to c=' + args.c + ' over r=' + args.r + ' second(s), and wind down to 0 at end)'),
+    'conChart': genReport.getChart('Test Concurrency (shows rampup from 0 to c=' + args.concurrency + ' over r=' + args.r + ' second(s), and wind down to 0 at end)'),
     'sucChart': genReport.getChart('Test Success/Fail (1=success, 0=fail)'),
     'timeChart': genReport.getChart('Time for each test to finish'),
-    'testInProgressChart': genReport.getChart('Current number of tests in progress (should equal c=' + args.c + ', except in rampup and wind down period)'),
+    'testInProgressChart': genReport.getChart('Current number of tests in progress (should equal c=' + args.concurrency + ', except in rampup and wind down period)'),
     'testInProgress': 0,
     'reqChart': genReport.getChart('Current number of test steps in progress'),
     'reqInProgress': 0,
     'testStartedChart': genReport.getChart('Number of tests started'),
     'testStarted': 0,
-    'testEndedChart': genReport.getChart('Number of tests finished (should equal n=' + args.n + ' when finished)'),
+    'testEndedChart': genReport.getChart('Number of tests finished (should equal n=' + args.numUsers + ' when finished)'),
     'testEnded': 0,
     'testSuccessChart': genReport.getChart('Number of tests succeeded'),
     'testSuccess': 0,
@@ -170,8 +193,8 @@ if (saveOutput) {
 
 
 var l = new loop.MultiLoop({
-  'numberOfTimes': args.n,
-  'concurrency': args.c,
+  'numberOfTimes': args.numUsers,
+  'concurrency': args.concurrency,
   'concurrencyProfile': [[0, 0], [args.r, args.c]],
 
   fun: function(finished) {
@@ -195,13 +218,14 @@ var l = new loop.MultiLoop({
 
     scriptArgs.forEach(
       function(arg, i) {
-        switch (arg) {
-          case '{runNum}': {
-            scriptArgs[i] = curRuns;
-            break;
-          }
+        if (arg === '{runNum}') {
+          scriptArgs[i] = curRuns;
         }
       });
+
+
+    //get flow number
+    const flowNumber = flowNumbers !== null ? flowNumbers[runs] : 0;
 
     /**
      * Environment variables for the test script.
@@ -209,10 +233,11 @@ var l = new loop.MultiLoop({
     var env = {
       'LR_RUN_NUMBER': curRuns,
       'LR_RAND': rand(),
-      'LR_RUN_COUNT': args.n
+      'LR_TOTAL_RUNS': args.numUsers,
+      'LR_FLOW_NUMBER': flowNumber
     };
 
-    logger.verbose('spawing with args:' + JSON.stringify(scriptArgs));
+    logger.verbose('spawing with args:' + JSON.stringify(scriptArgs) + ` flow number: ` + flowNumber);
 
     //spawns new process with environment variables merged with current environment variables
     var test = spawn('node', scriptArgs, {'env': Object.assign(process.env, env)});
@@ -360,7 +385,7 @@ var l = new loop.MultiLoop({
       var dataToWrite = (dataJson !== null) ? JSON.stringify(dataJson, null, 2) : (dataRaw !== null) ? ('RAW DATA\n' + dataRaw) : 'no content returned from test script';
       if (saveOutput) {
         // prefix zeros to run no. if required
-        var prefixZeros = ('' + args.n).length;
+        var prefixZeros = ('' + args.numUsers).length;
         var curRunsLength = ('' + curRuns).length;
         var prefixedRuns = curRunsLength < prefixZeros ? ('' + (Math.pow(10, prefixZeros - curRunsLength))).substring(1) + curRuns : curRuns;
 
