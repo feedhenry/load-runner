@@ -5,9 +5,8 @@
  Profiles define argument flags for load-runner.js and test script.
  */
 
-const async = require('async'),
-      _ = require('underscore'),
-      path = require('path');
+const async = require('async');
+const path = require('path');
 
 
 var args = require('yargs')
@@ -56,7 +55,7 @@ var q = async.queue(function profile_task(task, callback) {
       console.log(`stdout: ${stdout}`);
       if (stderr) {
         console.log(`stderr: ${stderr}`);
-        callback()
+        callback();
       }
     });
 });

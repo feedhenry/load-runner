@@ -14,7 +14,7 @@ function generateFlowArray(totalCount, flowPercentages, randGen) {
   if (!Array.isArray(flowPercentages)) {
     throw new TypeError('flowPercentages must be an array');
   }
-  let retArray = [];
+  const retArray = [];
   for (let i = 0; i < flowPercentages.length; i++) {
     for (let j = 0; j < (Math.ceil((flowPercentages[i] / 100) * totalCount)); j++) {
       retArray.push(i);

@@ -18,9 +18,7 @@ async.waterfall([ function init(cb) {
     return cb(err);
   });
 }, function login(cb) {
-  fh.login({_: ['testing-admin@example.com', 'PutAPasswordHere']}, function(err, res) {
-    return cb(err);
-  });
+  fh.login({_: ['testing-admin@example.com', 'PutAPasswordHere']}, cb);
 }, function projectCreate(cb) {
   fh.projects({_: ['list']}, function(err, projects) {
     return cb(err, projects);
