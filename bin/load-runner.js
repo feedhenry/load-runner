@@ -19,7 +19,6 @@ var util = require('util');
 var open = require('open');
 var lcg = require('compute-lcg');
 var _ = require('underscore');
-var setup_scripts = require('../setup/index.js');
 
 var args = require('yargs')
   .usage('NOTE: To pass any commands onto the script being executed, finish with a -- followed by any arguments to the passed. You can also pass a placeholder `{runNum}` to pass in the current test run number.')
@@ -97,6 +96,7 @@ var args = require('yargs')
   })
   .wrap(100).argv;
 
+var saveOutput = false;
 var logger = {
   logDir: '',
   info: function(msg) {
@@ -130,8 +130,6 @@ var logger = {
 
 // Setup output directory
 var outputDir = null;
-var saveOutput = false;
-var writeInProgess = 0;
 
 //initialize random number generator
 const seed = parseInt(args.seed);
@@ -372,7 +370,7 @@ var l = new loop.MultiLoop({
         if (saveOutput) {
           for (var ci = 0, cl = calls.length; ci < cl; ci += 1) {
             var ct = calls[ci];
-            if (reports[ct.action] == null) {
+            if (reports[ct.action] === null || reports[ct.action] === undefined) {
               reports[ct.action] = reporting.REPORT_MANAGER.addReport('Time for test step:' + ct.action.replace(/\//g, '_').replace(':', '_'));
             }
             logger.verbose('updating action chart:' + ct.action);
@@ -399,7 +397,18 @@ var l = new loop.MultiLoop({
       // if save output is true, create file containing actionStats in test output dir
       //       e.g. <curRuns>-<duration>.json
 
-      var dataToWrite = (dataJson !== null) ? JSON.stringify(dataJson, null, 2) : (dataRaw !== null) ? ('RAW DATA\n' + dataRaw) : 'no content returned from test script';
+      function chooseDataToWrite(json, raw) {
+        if (json !== null) { //could it be not null but undefined?
+          return JSON.stringify(json, null, 2);
+        } else if (raw !== null) { //could it be not null but undefined?
+          return ('RAW DATA\n' + raw);
+        } else {
+          return 'no content returned from test script';
+        }
+      }
+
+      const dataToWrite = chooseDataToWrite(dataJson, dataRaw);
+
       if (saveOutput) {
         // prefix zeros to run no. if required
         var prefixZeros = ('' + args.numUsers).length;
@@ -453,9 +462,14 @@ var before = function(beforeScript, cb) {
 
 var startTime;
 
+function finish(summary) {
+  logger.verbose(JSON.stringify(summary, null, 2));
+  process.exit(0);
+}
+
 // if the '--before' script is set, run it and wait with running the tests until before script completes
 if (args.b) {
-  before(args.b, function(exitCode) {
+  before(args.b, function() {
     startTime = Date.now();
     l.start();
   });
@@ -502,25 +516,25 @@ l.on('end', function() {
 
   // Get stats summary for each action
   for (var action in resMap) {
-    var tempStats = resMap[action];
-    summary.actions.push({
-      'action': action,
-      'successDuration': tempStats.successDuration.summary(),
-      'errorDuration': tempStats.errorDuration.summary(),
-      'status': tempStats.status.summary(),
-      'count': tempStats.count
-    });
+    if (resMap.hasOwnProperty(action)) {
+      var tempStats = resMap[action];
+      summary.actions.push({
+        'action': action,
+        'successDuration': tempStats.successDuration.summary(),
+        'errorDuration': tempStats.errorDuration.summary(),
+        'status': tempStats.status.summary(),
+        'count': tempStats.count
+      });
+    }
   }
 
   if (saveOutput) {
     // save summary to disk
     var summaryFilePath = outputDir + '/summary.json';
-    writeInProgess++;
     fs.writeFile(summaryFilePath, JSON.stringify(summary, null, 2), function(err) {
       if (err) {
         logger.verbose('Error writing file:' + summaryFilePath + '\n' + err.message);
       }
-      writeInProgess--;
     });
   }
 
@@ -539,11 +553,6 @@ l.on('end', function() {
     finish(summary);
   }
 });
-
-var finish = function(summary) {
-  logger.verbose(JSON.stringify(summary, null, 2));
-  process.exit(0);
-};
 
 if (saveOutput) {
   open('http://localhost:8000');

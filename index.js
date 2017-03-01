@@ -14,7 +14,7 @@ which load runner parses and maps out in graphs and results files
 
 var util = require('util');
 
-module.exports = function () {
+module.exports = function() {
   var lr = {
     logArr: ['lr started'],
 
@@ -22,11 +22,11 @@ module.exports = function () {
 
     acts: [],
 
-    log: function (msg) {
+    log: function(msg) {
       lr.logArr.push((new Date()).toJSON() + ' - ' + msg);
     },
 
-    actStart: function (id) {
+    actStart: function(id) {
       console.log('!+');
       lr.log('act started:' + id);
       lr.ids[id] = {
@@ -34,7 +34,7 @@ module.exports = function () {
       };
     },
 
-    actEnd: function (id, status, other) {
+    actEnd: function(id, status, other) {
       console.log('!-');
       var act = {
         'action': id,
@@ -48,14 +48,14 @@ module.exports = function () {
       lr.log('act ended:' + id + ' :: duration=' + act.duration);
     },
 
-    checkError: function (err) {
+    checkError: function(err) {
       lr.log('action finished :: err=' + typeof err + ' ' + util.inspect(err));
       if (err) {
         return lr.finish(1);
       }
     },
 
-    finish: function (status) {
+    finish: function(status) {
       console.log(JSON.stringify({
         'status': status,
         'actions': lr.acts,

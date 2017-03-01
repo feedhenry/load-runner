@@ -1,7 +1,8 @@
 {
   "env": {
+    "es6": true,
     "node": true,
-    "es6": true
+    "mocha": true
   },
   "extends": "eslint:recommended",
   "rules": {
@@ -24,6 +25,18 @@
     "space-before-blocks": "error",
     "space-before-function-paren": ["error", "never"],
     "keyword-spacing": ["error"],
-    "curly": ["error", "all"]
+    "curly": ["error", "all"],
+    "no-unused-vars": ["error", { "argsIgnorePattern": "next" }],
+    "no-const-assign": "error",
+    "no-use-before-define": ["error", "nofunc"],
+    "block-scoped-var": "error",
+    "prefer-const": "error",
+    "prefer-template": "warn",
+    "template-curly-spacing": ["error", "never"],
+    "no-confusing-arrow": ["error", {"allowParens": true}],
+    "arrow-parens": ["error", "as-needed"],
+    "arrow-body-style": ["error", "as-needed"],
+    "generator-star-spacing": ["error", "after"],
+    "require-yield": "error"
   }
 }
