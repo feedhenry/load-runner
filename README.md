@@ -3,14 +3,24 @@
 ```
 npm install
 ./bin/load-runner.js
-NOTE: To pass any commands onto the script being executed, finish with a -- followed by any arguments to the passed. You can also pass a placeholder `{runNum}` to pass in the current test run number.
+NOTE: To pass any commands onto the script being executed, finish with a -- followed by any
+arguments to the passed. You can also pass a placeholder `{runNum}` to pass in the current test run
+number.
 
 Options:
   -c, --concurrency  Concurrency of Users                                               [default: 1]
-  -n, --numUsers     Number of Users                                                    [default: 1]
+  -n, --numUsers     Number of Users (number of total runs)                             [default: 1]
   -r, --rampUp       Ramp up time to Concurrency of Users (in seconds)                  [default: 1]
   -b, --before       Library to execute before the start of tests
   -s, --script       Script to execute                                                    [required]
+  --seed             Seed for random number generator (otherwise generated from current time)
+                                                                                            [number]
+  -f, --flows        Each flow will be selected with probability specified by percentages specified
+                     with this parameter, you need to use this with LR_FLOW_NUM environment
+                     variable, must not be set with --pattern                                [array]
+  --pattern          Flow will be selected with repeated pattern specified by this parameter, you
+                     need to use this with LR_FLOW_NUM environment variable, must not be set with -f
+                     parameter                                                               [array]
   -o, --output       Whether or not to save logs, individual test script output and reports
                      Save destination will be:
                      runs/run_<script>_<timestamp>_<numUsers>_<concurrency>_<rampUp>/
@@ -18,8 +28,6 @@ Options:
   -p, --profile      Only usefull if "-o true".
                      Profile name, will be appended to output directory name:
                      e.g. runs/run_test.js_1329317523630_100_10_5-profilename/
-
-Missing required arguments: s
 ```
 
 For example:
@@ -33,6 +41,43 @@ It is possible to send args to the script under test by adding -- after the load
 ```
 ./bin/load-runner.js -s ./scripts/dummy.js -c 5 -n 100 -r 10 -o -- -testarg1 testval1
 ```
+
+# Environment variables
+
+There are some environment variables generated for the test script that can be useful. You can use Node.js `process.env` object to access them.
+
+* `LR_FLOW_NUMBER` - number generated each run, value depends on percentages specified by `-f` parameter, see [Flow numbers](#flow-numbers)  
+* `LR_TOTAL_RUNS` - total number of runs, it's value of `-n` parameter
+* `LR_RUN_NUMBER` - current test run number
+* `LR_RAND` - randomly generated value for each run, float between 0 and 1, based on random generation with `--seed` parameter
+
+Look at [scripts/dummy_env_vars.js](scripts/dummy_env_vars.js) for example of using this.
+
+
+# Flow numbers
+
+Flow number functionality can be used inside test script to determine which branch of script to be executed. 
+
+## Random way
+It can be specified by `-f` parameter and can be accessed by `LR_FLOW_NUMBER` environment variable in the script.
+
+For example this executes 5 times flow 0, 3 times flow 1, 2 times flow 2 from total of 10 runs.
+
+```
+./bin/load-runner.js -s ./scripts/dummy_flow_numbers.js -n 10 -o -f 50 30 20 --seed 123 
+```
+
+Flow numbers are randomly shuffled, but it's possible to use `--seed` parameter for repeatable result. 
+## Pattern
+
+Flow numbers can be also specified by repeating pattern, you can use `LR_FLOW_NUMBER` to access that number in the script.
+
+For example this repeats `0 0 0 1 1 2` pattern for the all 20 runs.
+
+```
+./bin/load-runner.js -s ./scripts/dummy_flow_numbers.js -n 20 -o -pattern 0 0 0 1 1 2 
+```
+
 
 # Output
 

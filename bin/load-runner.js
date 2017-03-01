@@ -2,13 +2,13 @@
 
 /*
 
-Load Runner
+ Load Runner
 
-Name based on the great classic game - Lode Runner
+ Name based on the great classic game - Lode Runner
  -Article: http://en.wikipedia.org/wiki/Lode_Runner
  -Online Game: http://www.classiconlinegames.nl/nintendo/174-loderunner
 
-*/
+ */
 
 var loop = require('nodeload/lib/loop');
 var runs = 0;
@@ -17,9 +17,11 @@ var stats = require('nodeload/lib/stats');
 var fs = require('fs');
 var util = require('util');
 var open = require('open');
+var lcg = require('compute-lcg');
+var _ = require('underscore');
 var setup_scripts = require('../setup/index.js');
 
-var args = require('optimist')
+var args = require('yargs')
   .usage('NOTE: To pass any commands onto the script being executed, finish with a -- followed by any arguments to the passed. You can also pass a placeholder `{runNum}` to pass in the current test run number.')
   .options('c', {
     'alias': 'concurrency',
@@ -29,7 +31,7 @@ var args = require('optimist')
   .options('n', {
     'alias': 'numUsers',
     'default': 1,
-    'describe': 'Number of Users'
+    'describe': 'Number of Users (number of total runs)'
   })
   .options('r', {
     'alias': 'rampUp',
@@ -46,44 +48,77 @@ var args = require('optimist')
     'demand': true,
     'describe': 'Script to execute'
   })
+  .options('seed', {
+    'demand': false,
+    'describe': 'Seed for random number generator (otherwise generated from current time)',
+    'type': 'number'
+  })
+  .options('f', {
+    'alias': 'flows',
+    'demand': false,
+    'describe': 'Each flow will be selected with probability specified by percentages specified with this parameter, you need to use this with LR_FLOW_NUM environment variable, must not be set with --pattern',
+    'type': 'array'
+  })
+  .options('pattern', {
+    'demand': false,
+    'describe': 'Flow will be selected with repeated pattern specified by this parameter, you need to use this with LR_FLOW_NUM environment variable, must not be set with -f parameter',
+    'type': 'array'
+  })
+  .conflicts('f', 'pattern')
   .options('o', {
     'alias': 'output',
     'default': 'false',
     'describe': 'Whether or not to save logs, individual test script output and reports' +
-      '\nSave destination will be:' +
-      '\nruns/run_<script>_<timestamp>_<numUsers>_<concurrency>_<rampUp>/' +
-      '\ne.g. runs/run_test.js_1329317523630_100_10_5/'
+    '\nSave destination will be:' +
+    '\nruns/run_<script>_<timestamp>_<numUsers>_<concurrency>_<rampUp>/' +
+    '\ne.g. runs/run_test.js_1329317523630_100_10_5/'
   })
   .options('p', {
     'alias': 'profile',
     'demand': false,
     'describe': 'Only usefull if "-o true".\nProfile name, will be appended to output directory name:' +
-      '\ne.g. runs/run_test.js_1329317523630_100_10_5-profilename/'
+    '\ne.g. runs/run_test.js_1329317523630_100_10_5-profilename/'
+  })
+  .check(function(argv) {
+    const seed = parseInt(argv.seed);
+    if (seed <= 0) {
+      console.log("--seed must be positive number");
+      return false;
+    }
+    if (Array.isArray(argv.flows) && _.some(argv.flows, x => isNaN(x))) {
+      console.log("-f, --flows must be array of numbers.");
+      return false;
+    }
+    if (Array.isArray(argv.pattern) && _.some(argv.pattern, x => isNaN(x))) {
+      console.log("--pattern must be array of numbers.");
+      return false;
+    }
+    return true;
   })
   .wrap(100).argv;
 
 var logger = {
   logDir: '',
-  info: function (msg) {
+  info: function(msg) {
     console.log(msg);
     logger.appendFile('info.txt', msg);
     logger.verbose(msg, true);
     logger.silly(msg, true);
   },
-  verbose: function (msg, dontConLog) {
+  verbose: function(msg, dontConLog) {
     if (!dontConLog) {
       console.log(msg);
     }
     logger.appendFile('verbose.txt', msg);
     logger.silly(msg, true);
   },
-  silly: function (msg, dontConLog) {
+  silly: function(msg, dontConLog) {
     if (!dontConLog) {
       console.log(msg);
     }
     logger.appendFile('silly.txt', msg);
   },
-  appendFile: function (file, msg) {
+  appendFile: function(file, msg) {
     // TODO: will async fs operations make any difference here?
     if (saveOutput) {
       var fileId = fs.openSync(logger.logDir + '/' + file, 'a');
@@ -98,6 +133,21 @@ var outputDir = null;
 var saveOutput = false;
 var writeInProgess = 0;
 
+//initialize random number generator
+const seed = parseInt(args.seed);
+const rand = isNaN(seed) ? lcg() : lcg(seed);
+
+//Flow number generation function
+const generateFlowArray = require('./flow_number_generator');
+
+var flowNumbers = null;
+if (Array.isArray(args.flows) && args.flows.length > 1) {
+  flowNumbers = generateFlowArray(args.numUsers, args.flows, rand);
+} else if (Array.isArray(args.pattern) && args.pattern.length > 1) {
+  flowNumbers = _.map(new Array(args.numUsers), (x, i) => args.pattern[i % args.pattern.length]); //repeats pattern specified
+}
+
+
 if (typeof args.o === 'boolean' || args.o === 'true') {
   saveOutput = true;
   var runsDir = './runs';
@@ -111,7 +161,7 @@ if (typeof args.o === 'boolean' || args.o === 'true') {
     // doesn't exist, create it
     fs.mkdirSync(runsDir);
   }
-  outputDir = runsDir + '/run_' + args.s.replace(/\//g, '_') + '_' + Date.now() + '_' + args.n + '_' + args.c + '_' + args.r + '_' + args.p;
+  outputDir = runsDir + '/run_' + args.s.replace(/\//g, '_') + '_' + Date.now() + '_' + args.numUsers + '_' + args.concurrency + '_' + args.r + '_' + args.p;
   fs.mkdirSync(outputDir);
   logger.logDir = outputDir;
   console.log('Output will be saved to ' + outputDir);
@@ -140,16 +190,16 @@ if (saveOutput) {
   reporting = require('nodeload/lib/reporting');
   genReport = reporting.REPORT_MANAGER.addReport('GENERAL');
   reports.core = {
-    'conChart': genReport.getChart('Test Concurrency (shows rampup from 0 to c=' + args.c + ' over r=' + args.r + ' second(s), and wind down to 0 at end)'),
+    'conChart': genReport.getChart('Test Concurrency (shows rampup from 0 to c=' + args.concurrency + ' over r=' + args.r + ' second(s), and wind down to 0 at end)'),
     'sucChart': genReport.getChart('Test Success/Fail (1=success, 0=fail)'),
     'timeChart': genReport.getChart('Time for each test to finish'),
-    'testInProgressChart': genReport.getChart('Current number of tests in progress (should equal c=' + args.c + ', except in rampup and wind down period)'),
+    'testInProgressChart': genReport.getChart('Current number of tests in progress (should equal c=' + args.concurrency + ', except in rampup and wind down period)'),
     'testInProgress': 0,
     'reqChart': genReport.getChart('Current number of test steps in progress'),
     'reqInProgress': 0,
     'testStartedChart': genReport.getChart('Number of tests started'),
     'testStarted': 0,
-    'testEndedChart': genReport.getChart('Number of tests finished (should equal n=' + args.n + ' when finished)'),
+    'testEndedChart': genReport.getChart('Number of tests finished (should equal n=' + args.numUsers + ' when finished)'),
     'testEnded': 0,
     'testSuccessChart': genReport.getChart('Number of tests succeeded'),
     'testSuccess': 0,
@@ -158,12 +208,13 @@ if (saveOutput) {
   };
 }
 
+
 var l = new loop.MultiLoop({
-  'numberOfTimes': args.n,
-  'concurrency': args.c,
+  'numberOfTimes': args.numUsers,
+  'concurrency': args.concurrency,
   'concurrencyProfile': [[0, 0], [args.r, args.c]],
 
-  fun: function (finished) {
+  fun: function(finished) {
     logger.verbose('l.concurrency:' + l.concurrency);
     if (saveOutput) {
       reports.core.conChart.put({
@@ -182,21 +233,37 @@ var l = new loop.MultiLoop({
 
     var scriptArgs = [args.s].concat(args._);
 
-    scriptArgs.forEach(function(arg, i) {
-      if (arg === '{runNum}') {
-        scriptArgs[i] = curRuns;
-      }
-    });
+    scriptArgs.forEach(
+      function(arg, i) {
+        if (arg === '{runNum}') {
+          scriptArgs[i] = curRuns;
+        }
+      });
 
-    logger.verbose('spawing with args:' + JSON.stringify(scriptArgs));
-    
-    var test = spawn('node', scriptArgs);
+
+    //get flow number
+    const flowNumber = flowNumbers !== null ? flowNumbers[runs] : 0;
+
+    /**
+     * Environment variables for the test script.
+     */
+    var env = {
+      'LR_RUN_NUMBER': curRuns,
+      'LR_RAND': rand(),
+      'LR_TOTAL_RUNS': args.numUsers,
+      'LR_FLOW_NUMBER': flowNumber
+    };
+
+    logger.verbose(`spawing with args: ${JSON.stringify(scriptArgs)}  flow number: ${flowNumber}`);
+
+    //spawns new process with environment variables merged with current environment variables
+    var test = spawn('node', scriptArgs, {'env': Object.assign(process.env, env)});
     runs++;
 
     // Read in json output from test run
     var dataRaw = null;
 
-    test.stdout.on('data', function (data) {
+    test.stdout.on('data', function(data) {
       logger.verbose(curRuns + ': received data length=' + data.length);
       // logger.info('data:'' + data.toString().substring(0,1) + ''');
       if (dataRaw === null) {
@@ -238,7 +305,7 @@ var l = new loop.MultiLoop({
       }
     });
 
-    test.stderr.on('data', function (data) {
+    test.stderr.on('data', function(data) {
       logger.info(curRuns + ': received error data:' + data);
       if (dataRaw === null) {
         dataRaw = '';
@@ -246,7 +313,7 @@ var l = new loop.MultiLoop({
       dataRaw += data;
     });
 
-    test.on('close', function (code) {
+    test.on('close', function(code) {
       logger.info(curRuns + ':END - exit code = ' + code);
       if (saveOutput) {
         reports.core.conChart.put({
@@ -335,14 +402,14 @@ var l = new loop.MultiLoop({
       var dataToWrite = (dataJson !== null) ? JSON.stringify(dataJson, null, 2) : (dataRaw !== null) ? ('RAW DATA\n' + dataRaw) : 'no content returned from test script';
       if (saveOutput) {
         // prefix zeros to run no. if required
-        var prefixZeros = ('' + args.n).length;
+        var prefixZeros = ('' + args.numUsers).length;
         var curRunsLength = ('' + curRuns).length;
         var prefixedRuns = curRunsLength < prefixZeros ? ('' + (Math.pow(10, prefixZeros - curRunsLength))).substring(1) + curRuns : curRuns;
 
         var dataFileName = prefixedRuns + '-' + (success ? 'ok' : 'error') + '-' + duration + '.json';
         var dataFilePath = outputDir + '/' + dataFileName;
 
-        fs.writeFile(dataFilePath, dataToWrite, function (err) {
+        fs.writeFile(dataFilePath, dataToWrite, function(err) {
           if (err) {
             logger.info(curRuns + ':Error writing file:' + dataFilePath + '\n' + err.message);
           }
@@ -350,7 +417,7 @@ var l = new loop.MultiLoop({
 
         // write log output if we have any
         if (dataJson !== null && (typeof dataJson.log !== 'undefined')) {
-          fs.writeFile(dataFilePath.replace('.json', '.txt'), dataJson.log, function (err) {
+          fs.writeFile(dataFilePath.replace('.json', '.txt'), dataJson.log, function(err) {
             if (err) {
               logger.info(curRuns + ':Error writing file:' + dataFilePath + '\n' + err.message);
             }
@@ -368,14 +435,14 @@ var l = new loop.MultiLoop({
   }
 });
 
-/** 
+/**
  * Utility to manage execution of scripts 'before' the start of load-test
  * the 'before' script will be passed same parsed arguments as the
- * 
+ *
  * @param {String} beforeScript - Path to the script to run
  * @param {Function} cb - Callback, will be passed process exitCode
- **/ 
-var before = function (beforeScript, cb) {
+ **/
+var before = function(beforeScript, cb) {
   var scriptArgs = [args.b].concat(args._);
   var beforeScriptProcess = spawn('node', scriptArgs);
 
@@ -388,7 +455,7 @@ var startTime;
 
 // if the '--before' script is set, run it and wait with running the tests until before script completes
 if (args.b) {
-  before(args.b, function (exitCode) {
+  before(args.b, function(exitCode) {
     startTime = Date.now();
     l.start();
   });
@@ -397,7 +464,7 @@ if (args.b) {
   l.start();
 }
 
-l.on('end', function () {
+l.on('end', function() {
   var summary = {
     'duration': Date.now() - startTime,
     'successRuns': {
@@ -449,7 +516,7 @@ l.on('end', function () {
     // save summary to disk
     var summaryFilePath = outputDir + '/summary.json';
     writeInProgess++;
-    fs.writeFile(summaryFilePath, JSON.stringify(summary, null, 2), function (err) {
+    fs.writeFile(summaryFilePath, JSON.stringify(summary, null, 2), function(err) {
       if (err) {
         logger.verbose('Error writing file:' + summaryFilePath + '\n' + err.message);
       }
@@ -459,7 +526,7 @@ l.on('end', function () {
 
   if (saveOutput) {
     logger.verbose('wating 5000ms for charting/fs operations to finish');
-    setTimeout(function () {
+    setTimeout(function() {
       if (saveOutput) {
         var reportFile = reporting.REPORT_MANAGER.logNameOrObject;
         var destFile = outputDir + '/' + reportFile;
@@ -473,7 +540,7 @@ l.on('end', function () {
   }
 });
 
-var finish = function (summary) {
+var finish = function(summary) {
   logger.verbose(JSON.stringify(summary, null, 2));
   process.exit(0);
 };

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-var args = require('optimist');
+var args = require('yargs');
 var lr = require('../index.js')();
 var login = require('../lib/login');
 var hosts = require('../lib/appHosts');
