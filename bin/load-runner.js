@@ -19,6 +19,7 @@ var util = require('util');
 var open = require('open');
 var lcg = require('compute-lcg');
 var _ = require('underscore');
+var path = require('path');
 
 var args = require('yargs')
   .usage('NOTE: To pass any commands onto the script being executed, finish with a -- followed by any arguments to the passed. You can also pass a placeholder `{runNum}` to pass in the current test run number.')
@@ -477,7 +478,20 @@ if (args.b) {
 }
 
 l.on('end', function() {
+  // strip out /path/to/node, and just have 'load-runner' instead of /path/to/load_runner
+  const invocation = _.flatten([path.basename(_.head(_.tail(process.argv))), _.tail(_.tail(process.argv))]).join(' ');
+
   var summary = {
+    'invocation': invocation,
+    'concurrency': args.concurrency,
+    'numUsers': args.numUsers,
+    'rampUp': args.rampUp,
+    'before': args.before,
+    'script': args.script,
+    'seed': args.seed,
+    'flows': args.flows,
+    'pattern': args.pattern,
+    'profile': args.profile,
     'duration': Date.now() - startTime,
     'successRuns': {
       'duration': successRuns.duration.summary(),
