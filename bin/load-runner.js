@@ -121,8 +121,8 @@ var logger = {
   appendFile: function(file, msg) {
     // TODO: will async fs operations make any difference here?
     if (saveOutput) {
-      var fileId = fs.openSync(logger.logDir + '/' + file, 'a');
-      fs.writeSync(fileId, '\n' + (new Date()).toJSON() + ' - ' + msg, null, 'utf8');
+      var fileId = fs.openSync(`${logger.logDir}/${file}`, 'a');
+      fs.writeSync(fileId, `\n${(new Date()).toJSON()} - ${msg}`, null, 'utf8');
       fs.closeSync(fileId);
     }
   }
@@ -159,10 +159,10 @@ if (typeof args.o === 'boolean' || args.o === 'true') {
     // doesn't exist, create it
     fs.mkdirSync(runsDir);
   }
-  outputDir = runsDir + '/run_' + args.s.replace(/\//g, '_') + '_' + Date.now() + '_' + args.numUsers + '_' + args.concurrency + '_' + args.r + '_' + args.p;
+  outputDir = `${runsDir}/run_${args.s.replace(/\//g, '_')}_${Date.now()}_${args.numUsers}_${args.concurrency}_${args.r}_${args.p}`;
   fs.mkdirSync(outputDir);
   logger.logDir = outputDir;
-  console.log('Output will be saved to ' + outputDir);
+  console.log(`Output will be saved to ${outputDir}`);
 }
 
 logger.info('Init info logging');
@@ -188,16 +188,16 @@ if (saveOutput) {
   reporting = require('nodeload/lib/reporting');
   genReport = reporting.REPORT_MANAGER.addReport('GENERAL');
   reports.core = {
-    'conChart': genReport.getChart('Test Concurrency (shows rampup from 0 to c=' + args.concurrency + ' over r=' + args.r + ' second(s), and wind down to 0 at end)'),
+    'conChart': genReport.getChart(`Test Concurrency (shows rampup from 0 to c=${args.concurrency} over r=${args.r} second(s), and wind down to 0 at end)`),
     'sucChart': genReport.getChart('Test Success/Fail (1=success, 0=fail)'),
     'timeChart': genReport.getChart('Time for each test to finish'),
-    'testInProgressChart': genReport.getChart('Current number of tests in progress (should equal c=' + args.concurrency + ', except in rampup and wind down period)'),
+    'testInProgressChart': genReport.getChart(`Current number of tests in progress (should equal c=${args.concurrency}, except in rampup and wind down period)`),
     'testInProgress': 0,
     'reqChart': genReport.getChart('Current number of test steps in progress'),
     'reqInProgress': 0,
     'testStartedChart': genReport.getChart('Number of tests started'),
     'testStarted': 0,
-    'testEndedChart': genReport.getChart('Number of tests finished (should equal n=' + args.numUsers + ' when finished)'),
+    'testEndedChart': genReport.getChart(`Number of tests finished (should equal n=${args.numUsers} when finished)`),
     'testEnded': 0,
     'testSuccessChart': genReport.getChart('Number of tests succeeded'),
     'testSuccess': 0,
@@ -213,7 +213,7 @@ var l = new loop.MultiLoop({
   'concurrencyProfile': [[0, 0], [args.r, args.c]],
 
   fun: function(finished) {
-    logger.verbose('l.concurrency:' + l.concurrency);
+    logger.verbose(`l.concurrency:${l.concurrency}`);
     if (saveOutput) {
       reports.core.conChart.put({
         'concurrency': l.concurrency
@@ -226,7 +226,7 @@ var l = new loop.MultiLoop({
       });
     }
     var curRuns = runs + 1;
-    logger.info(curRuns + ':START');
+    logger.info(`${curRuns}:START`);
     var start = Date.now();
 
     var scriptArgs = [args.s].concat(args._);
@@ -262,14 +262,14 @@ var l = new loop.MultiLoop({
     var dataRaw = null;
 
     test.stdout.on('data', function(data) {
-      logger.verbose(curRuns + ': received data length=' + data.length);
+      logger.verbose(`${curRuns}: received data length=${data.length}`);
       // logger.info('data:'' + data.toString().substring(0,1) + ''');
       if (dataRaw === null) {
         dataRaw = '';
       }
       var dataString = (typeof data !== 'undefined') ? data.toString() : null;
       var dataFirstChar = (dataString.length > 0) ? dataString.substring(0, 1) : '';
-      logger.silly(curRuns + ': dataFirstChar=' + dataFirstChar);
+      logger.silly(`${curRuns}: dataFirstChar=${dataFirstChar}`);
       // keep track of requests in progress if script tells us
       if (dataFirstChar === '!') {
         logger.silly('first char !');
@@ -277,24 +277,22 @@ var l = new loop.MultiLoop({
         chars = chars.splice(0, chars.length - ((dataString.substring(dataString.length - 1) === '\n') ? 1 : 0));
         for (var ci = 0, cl = chars.length; ci < cl; ci += 1) {
           var ct = chars[ci];
-          logger.silly('ct=' + ct);
+          logger.silly(`ct=${ct}`);
           if (ct.length > 2) {
             // got json response at end of test. let's not forget about it
             dataRaw += chars.splice(ci - 1, chars.length).join('\n');
             break;
-          } else {
-            if (saveOutput) {
-              if (ct === '!+') {
+          } else if (saveOutput) {
+            if (ct === '!+') {
                 // logger.info('req++');
-                reports.core.reqChart.put({
-                  'requests': (reports.core.reqInProgress++ + 1)
-                });
-              } else if (ct === '!-') {
+              reports.core.reqChart.put({
+                'requests': (reports.core.reqInProgress++ + 1)
+              });
+            } else if (ct === '!-') {
                 // logger.info('req--');
-                reports.core.reqChart.put({
-                  'requests': (reports.core.reqInProgress-- - 1)
-                });
-              }
+              reports.core.reqChart.put({
+                'requests': (reports.core.reqInProgress-- - 1)
+              });
             }
           }
         }
@@ -304,7 +302,7 @@ var l = new loop.MultiLoop({
     });
 
     test.stderr.on('data', function(data) {
-      logger.info(curRuns + ': received error data:' + data);
+      logger.info(`${curRuns}: received error data:${data}`);
       if (dataRaw === null) {
         dataRaw = '';
       }
@@ -312,7 +310,7 @@ var l = new loop.MultiLoop({
     });
 
     test.on('close', function(code) {
-      logger.info(curRuns + ':END - exit code = ' + code);
+      logger.info(`${curRuns}:END - exit code = ${code}`);
       if (saveOutput) {
         reports.core.conChart.put({
           'concurrency': l.loops.length
@@ -326,7 +324,7 @@ var l = new loop.MultiLoop({
       }
       // Record duration of test
       var duration = Date.now() - start;
-      logger.verbose(curRuns + ':');
+      logger.verbose(`${curRuns}:`);
       if (saveOutput) {
         reports.core.timeChart.put({
           'duration': duration
@@ -371,9 +369,9 @@ var l = new loop.MultiLoop({
           for (var ci = 0, cl = calls.length; ci < cl; ci += 1) {
             var ct = calls[ci];
             if (reports[ct.action] === null || reports[ct.action] === undefined) {
-              reports[ct.action] = reporting.REPORT_MANAGER.addReport('Time for test step:' + ct.action.replace(/\//g, '_').replace(':', '_'));
+              reports[ct.action] = reporting.REPORT_MANAGER.addReport(`Time for test step:${ct.action.replace(/\//g, '_').replace(':', '_')}`);
             }
-            logger.verbose('updating action chart:' + ct.action);
+            logger.verbose(`updating action chart:${ct.action}`);
             var chart;
             if (success) {
               chart = reports[ct.action].getChart('SUCCESS');
@@ -389,8 +387,8 @@ var l = new loop.MultiLoop({
           }
         }
       } catch (e) {
-        logger.info('Error iterating over test result calls: ' + util.inspect(e));
-        logger.info('dataRaw:' + dataRaw);
+        logger.info(`Error iterating over test result calls: ${util.inspect(e)}`);
+        logger.info(`dataRaw:${dataRaw}`);
         runsObj.status.put('error');
       }
 
@@ -401,7 +399,7 @@ var l = new loop.MultiLoop({
         if (json !== null) { //could it be not null but undefined?
           return JSON.stringify(json, null, 2);
         } else if (raw !== null) { //could it be not null but undefined?
-          return ('RAW DATA\n' + raw);
+          return (`RAW DATA\n${raw}`);
         } else {
           return 'no content returned from test script';
         }
@@ -411,16 +409,16 @@ var l = new loop.MultiLoop({
 
       if (saveOutput) {
         // prefix zeros to run no. if required
-        var prefixZeros = ('' + args.numUsers).length;
-        var curRunsLength = ('' + curRuns).length;
-        var prefixedRuns = curRunsLength < prefixZeros ? ('' + (Math.pow(10, prefixZeros - curRunsLength))).substring(1) + curRuns : curRuns;
+        var prefixZeros = (`${args.numUsers}`).length;
+        var curRunsLength = (`${curRuns}`).length;
+        var prefixedRuns = curRunsLength < prefixZeros ? (`${Math.pow(10, prefixZeros - curRunsLength)}`).substring(1) + curRuns : curRuns;
 
-        var dataFileName = prefixedRuns + '-' + (success ? 'ok' : 'error') + '-' + duration + '.json';
-        var dataFilePath = outputDir + '/' + dataFileName;
+        var dataFileName = `${prefixedRuns}-${success ? 'ok' : 'error'}-${duration}.json`;
+        var dataFilePath = `${outputDir}/${dataFileName}`;
 
         fs.writeFile(dataFilePath, dataToWrite, function(err) {
           if (err) {
-            logger.info(curRuns + ':Error writing file:' + dataFilePath + '\n' + err.message);
+            logger.info(`${curRuns}:Error writing file:${dataFilePath}\n${err.message}`);
           }
         });
 
@@ -428,7 +426,7 @@ var l = new loop.MultiLoop({
         if (dataJson !== null && (typeof dataJson.log !== 'undefined')) {
           fs.writeFile(dataFilePath.replace('.json', '.txt'), dataJson.log, function(err) {
             if (err) {
-              logger.info(curRuns + ':Error writing file:' + dataFilePath + '\n' + err.message);
+              logger.info(`${curRuns}:Error writing file:${dataFilePath}\n${err.message}`);
             }
           });
         }
@@ -436,8 +434,8 @@ var l = new loop.MultiLoop({
 
       // log all errors separately also
       if (!success) {
-        logger.verbose(curRuns + ': Error response: ' + dataToWrite);
-        logger.appendFile('errors.txt', curRuns + ':' + dataToWrite);
+        logger.verbose(`${curRuns}: Error response: ${dataToWrite}`);
+        logger.appendFile('errors.txt', `${curRuns}:${dataToWrite}`);
       }
       finished();
     });
@@ -530,10 +528,10 @@ l.on('end', function() {
 
   if (saveOutput) {
     // save summary to disk
-    var summaryFilePath = outputDir + '/summary.json';
+    var summaryFilePath = `${outputDir}/summary.json`;
     fs.writeFile(summaryFilePath, JSON.stringify(summary, null, 2), function(err) {
       if (err) {
-        logger.verbose('Error writing file:' + summaryFilePath + '\n' + err.message);
+        logger.verbose(`Error writing file:${summaryFilePath}\n${err.message}`);
       }
     });
   }
@@ -543,8 +541,8 @@ l.on('end', function() {
     setTimeout(function() {
       if (saveOutput) {
         var reportFile = reporting.REPORT_MANAGER.logNameOrObject;
-        var destFile = outputDir + '/' + reportFile;
-        logger.info('moving report results from ' + reportFile + ' to ' + destFile);
+        var destFile = `${outputDir}/${reportFile}`;
+        logger.info(`moving report results from ${reportFile} to ${destFile}`);
         fs.renameSync(reportFile, destFile);
       }
       finish(summary);
