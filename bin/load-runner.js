@@ -478,6 +478,7 @@ if (args.b) {
 }
 
 l.on('end', function() {
+  const endTime = Date.now();
   // strip out /path/to/node, and just have 'load-runner' instead of /path/to/load_runner
   const invocation = _.flatten([path.basename(_.head(_.tail(process.argv))), _.tail(_.tail(process.argv))]).join(' ');
 
@@ -492,7 +493,9 @@ l.on('end', function() {
     'flows': args.flows,
     'pattern': args.pattern,
     'profile': args.profile,
-    'duration': Date.now() - startTime,
+    'startTime': startTime,
+    'endTime': endTime,
+    'duration': endTime - startTime,
     'successRuns': {
       'duration': successRuns.duration.summary(),
       'status': successRuns.status.summary()
