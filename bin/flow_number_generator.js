@@ -29,7 +29,9 @@ function generateFlowArray(totalCount, flowPercentages, randGen) {
  * @param {number=} randGen seed based random generator (LCG)
  */
 function shuffle(arr, randGen) {
-  let temp, j, i = arr.length;
+  let temp = null;
+  let j = null;
+  let i = arr.length;
   let rand = randGen;
   if (typeof rand === 'undefined') {
     rand = Math.random;

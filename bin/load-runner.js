@@ -18,6 +18,7 @@ var fs = require('fs');
 var util = require('util');
 var open = require('open');
 var lcg = require('compute-lcg');
+var _ = require('underscore');
 var setup_scripts = require('../setup/index.js');
 
 var args = require('yargs')
@@ -55,9 +56,15 @@ var args = require('yargs')
   .options('f', {
     'alias': 'flows',
     'demand': false,
-    'describe': 'Each flow will be selected with probability specified by percentages specified with this parameter, you need to use this with LR_FLOW_NUM environment variable',
+    'describe': 'Each flow will be selected with probability specified by percentages specified with this parameter, you need to use this with LR_FLOW_NUM environment variable, must not be set with --pattern',
     'type': 'array'
   })
+  .options('pattern', {
+    'demand': false,
+    'describe': 'Flow will be selected with repeated pattern specified by this parameter, you need to use this with LR_FLOW_NUM environment variable, must not be set with -f parameter',
+    'type': 'array'
+  })
+  .conflicts('f', 'pattern')
   .options('o', {
     'alias': 'output',
     'default': 'false',
@@ -76,6 +83,14 @@ var args = require('yargs')
     const seed = parseInt(argv.seed);
     if (seed <= 0) {
       console.log("--seed must be positive number");
+      return false;
+    }
+    if (Array.isArray(argv.flows) && _.some(argv.flows, x => isNaN(x))) {
+      console.log("-f, --flows must be array of numbers.");
+      return false;
+    }
+    if (Array.isArray(argv.pattern) && _.some(argv.pattern, x => isNaN(x))) {
+      console.log("--pattern must be array of numbers.");
       return false;
     }
     return true;
@@ -128,6 +143,8 @@ const generateFlowArray = require('./flow_number_generator');
 var flowNumbers = null;
 if (Array.isArray(args.flows) && args.flows.length > 1) {
   flowNumbers = generateFlowArray(args.numUsers, args.flows, rand);
+} else if (Array.isArray(args.pattern) && args.pattern.length > 1) {
+  flowNumbers = _.map(new Array(args.numUsers), (x, i) => args.pattern[i % args.pattern.length]); //repeats pattern specified
 }
 
 
@@ -237,7 +254,7 @@ var l = new loop.MultiLoop({
       'LR_FLOW_NUMBER': flowNumber
     };
 
-    logger.verbose('spawing with args:' + JSON.stringify(scriptArgs) + ` flow number: ` + flowNumber);
+    logger.verbose(`spawing with args: ${JSON.stringify(scriptArgs)}  flow number: ${flowNumber}`);
 
     //spawns new process with environment variables merged with current environment variables
     var test = spawn('node', scriptArgs, {'env': Object.assign(process.env, env)});

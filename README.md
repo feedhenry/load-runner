@@ -16,8 +16,11 @@ Options:
   --seed             Seed for random number generator (otherwise generated from current time)
                                                                                             [number]
   -f, --flows        Each flow will be selected with probability specified by percentages specified
-                     with this parameter, you need to use this with LR_FLOW_NUM environment variable
-                                                                                             [array]
+                     with this parameter, you need to use this with LR_FLOW_NUM environment
+                     variable, must not be set with --pattern                                [array]
+  --pattern          Flow will be selected with repeated pattern specified by this parameter, you
+                     need to use this with LR_FLOW_NUM environment variable, must not be set with -f
+                     parameter                                                               [array]
   -o, --output       Whether or not to save logs, individual test script output and reports
                      Save destination will be:
                      runs/run_<script>_<timestamp>_<numUsers>_<concurrency>_<rampUp>/
@@ -54,7 +57,9 @@ Look at [scripts/dummy_env_vars.js](scripts/dummy_env_vars.js) for example of us
 # Flow numbers
 
 Flow number functionality can be used inside test script to determine which branch of script to be executed. 
-It's specified by `-f` parameter and can be accessed by `LR_FLOW_NUMBER` environment variable in the script.
+
+## Random way
+It can be specified by `-f` parameter and can be accessed by `LR_FLOW_NUMBER` environment variable in the script.
 
 For example this executes 5 times flow 0, 3 times flow 1, 2 times flow 2 from total of 10 runs.
 
@@ -63,6 +68,16 @@ For example this executes 5 times flow 0, 3 times flow 1, 2 times flow 2 from to
 ```
 
 Flow numbers are randomly shuffled, but it's possible to use `--seed` parameter for repeatable result. 
+## Pattern
+
+Flow numbers can be also specified by repeating pattern, you can use `LR_FLOW_NUMBER` to access that number in the script.
+
+For example this repeats `0 0 0 1 1 2` pattern for the all 20 runs.
+
+```
+./bin/load-runner.js -s ./scripts/dummy_flow_numbers.js -n 20 -o -pattern 0 0 0 1 1 2 
+```
+
 
 # Output
 
