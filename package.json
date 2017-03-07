@@ -1,6 +1,6 @@
 {
   "name": "load-runner",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "FeedHenry",
   "license": "Apache-2.0",
   "bin": "./bin/load-runner.js",
