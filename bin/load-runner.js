@@ -450,14 +450,16 @@ var l = new loop.MultiLoop({
  * @param {String} beforeScript - Path to the script to run
  * @param {Function} cb - Callback, will be passed process exitCode
  **/
-var before = function(beforeScript, cb) {
-  var scriptArgs = [args.b].concat(args._);
-  var beforeScriptProcess = spawn('node', scriptArgs);
-
-  beforeScriptProcess.on('exit', function onBeforeScriptExit(exitCode) {
-    cb(exitCode);
-  });
-};
+function before(beforeScript, cb) {
+  // Additional desired args that aren't in `args._` from yargs
+  const lrArgs = _.reduce(_.pick(args, ['script', 'concurrency', 'numUsers', 'rampUp', 'pattern']),
+                          //re-add '--' to key; re-join pattern array to spaced string
+                          (res, v, k) => res.concat([`--${k}`, k === 'pattern' ? v.join(' ') : v]),
+                          []);
+  const scriptArgs = lrArgs.concat(args._);
+  const beforeScriptProcess = spawn('node', [args.b].concat(scriptArgs), {'env': process.env});
+  return beforeScriptProcess.on('exit', cb);
+}
 
 var startTime;
 
