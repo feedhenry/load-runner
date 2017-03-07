@@ -60,6 +60,7 @@ var args = require('yargs')
     'type': 'array'
   })
   .options('pattern', {
+    'default': [],
     'demand': false,
     'describe': 'Flow will be selected with repeated pattern specified by this parameter, you need to use this with LR_FLOW_NUM environment variable, must not be set with -f parameter',
     'type': 'array'
@@ -457,7 +458,10 @@ function before(beforeScript, cb) {
                           (res, v, k) => res.concat([`--${k}`, k === 'pattern' ? v.join(' ') : v]),
                           []);
   const scriptArgs = lrArgs.concat(args._);
-  const beforeScriptProcess = spawn('node', [args.b].concat(scriptArgs), {'env': process.env});
+  const beforeScriptProcess = spawn('node', [args.b].concat(scriptArgs), {
+    'env': process.env,
+    'stdio': 'inherit'
+  });
   return beforeScriptProcess.on('exit', cb);
 }
 
